@@ -1,0 +1,179 @@
+---
+title: "Discriminant Analysis"
+author: "Daniel Kim"
+date: "2/27/2020"
+output:
+  pdf_document: default
+  html_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+library(MASS)
+library(heplots)
+library(DiscriMiner)
+library(klaR)
+```
+
+1)
+Let's look at boxplots for both sun and rain quantity between wine quality groups to see if there appears to be differences.
+```{r}
+boxplot(sun~ quality, data=bordeaux, col = c("red", "blue", "brown"), horizontal = T, main = "Sun Quantity by Wine Quality")
+
+boxplot(rain ~ quality, data=bordeaux, col = c("red", "blue", "brown"), horizontal = T, main = "Rain Quantity by Wine Quality")
+```
+
+
+There in fact appears to be differences between groups. Now let's look at CSQ plots for each group to see if multivariate normality within each group holds
+```{r}
+#see if data is multivariate normal in EACH GROUP
+#get online function
+source("http://www.reuningscherer.net/STAT660/R/CSQPlot.r.txt")
+
+#examine multivariate normality within each belly group
+CSQPlot(bordeaux[bordeaux$quality == "bad", c("sun","rain")], label = "Control")
+CSQPlot(bordeaux[bordeaux$quality == "medium", c("sun","rain")], label = "Control")
+CSQPlot(bordeaux[bordeaux$quality == "good", c("sun","rain")], label = "Control")
+```
+For all three chi-square quantile plots, multivariate normality does seem to hold. We don't need to apply any transformations to the data.
+
+Let's plot the data together to see visually if we can assume equality of covariance matrices.
+```{r}
+plot(bordeaux$sun, bordeaux$rain, col = as.numeric(bordeaux$quality)+1, pch = 19, main = "Bordeaux Wine Data", ylab = "Rain", xlab = "Sun")
+legend("topright", col = c(2:4), legend = levels(bordeaux$quality), pch = 19)
+```
+
+We can also look at the Covariance matrices themselves
+```{r}
+print("Covariance Matrix for Bad Wine")
+cov((bordeaux[bordeaux$quality == "bad", c("sun","rain")]))
+
+print("Covariance Matrix for Medium Wine")
+cov((bordeaux[bordeaux$quality == "medium", c("sun","rain")]))
+
+print("Covariance Matrix for Good Wine")
+cov((bordeaux[bordeaux$quality == "good", c("sun","rain")]))
+
+#calculate Box's M statistic
+boxM(bordeaux[,c("sun","rain")], bordeaux$quality)
+```
+It does appear that we can assume equality of covariance matrices since the p value is well above a rejection threshold of around 0.05. We seem to fit the assumptions of discriminant analysis and because of the homogeneity among covariance matrices, we use linear discriminant analysis.
+
+
+2) Linear Discriminant Analysis
+
+Because of the homogeneity among the covariance matrices, we would run linear discriminant analysis as the best model
+```{r}
+bordeaux.disc <- lda(bordeaux[,c(3,5)], grouping = bordeaux$quality)
+names(bordeaux.disc)
+
+(step1 <- stepclass(quality ~ sun + rain, data = bordeaux, method = "lda", direction = 'both'))
+step1
+step1$model
+
+```
+The model includes the variables both sun and rain indicating that they are two significant discriminating variables in sun and rain
+
+
+3) Let's Run the Multivariate Wilk's Lambda test
+```{r}
+bordeaux.manova <- manova(as.matrix(bordeaux[,c(3,5)]) ~ bordeaux$quality)
+summary.manova(bordeaux.manova, test="Wilks")
+```
+There is statistical evidence that the multivariate means are different. We reject the null meaning that it is possible to discriminate between the bad, medium, and good quality. 
+
+4)
+```{r}
+summary.aov(bordeaux.manova)
+```
+There exists at least one function that is significant in discriminating between groups.
+
+```{r}
+bordeaux.disc
+```
+Looking at the proportion of trace, there are two discriminating functions but LD1 holds more importance than LD2. LD1 holds much more discriminating power relative to LD2
+
+5)
+
+```{r}
+# raw results - use the 'predict' function
+
+ctraw <- table(bordeaux$quality, predict(bordeaux.disc)$class)
+ctraw
+
+# total percent correct
+round(sum(diag(prop.table(ctraw))),2)
+
+#cross-validated results
+bordeaux.discCV <- lda(bordeaux$quality ~ bordeaux$rain + bordeaux$sun, CV = TRUE)
+ctCV <- table(bordeaux$quality, bordeaux.discCV$class)
+ctCV
+# total percent correct
+round(sum(diag(prop.table(ctCV))), 2)
+```
+Both percentages for classification with and without cross validation are the same at 74% correct
+
+6)
+```{r}
+bordeaux.disc
+```
+Looking at the Coefficients for LD1, sun is a better discriminator between groups than rain since its coefficient is of larger magnitude for the stronger discriminant function. This is supplanted by looking at our boxplots from earlier since visually the 3 groups seem to differ more according to the sun variable.
+
+```{r}
+boxplot(sun~ quality, data=bordeaux, col = c("red", "blue", "brown"), horizontal = T, main = "Sun Quantity by Wine Quality")
+
+boxplot(rain ~ quality, data=bordeaux, col = c("red", "blue", "brown"), horizontal = T, main = "Rain Quantity by Wine Quality")
+```
+
+7)
+```{r}
+#SCORE PLOTS for linear DA
+bordeauxlda <- lda(bordeaux[,c("rain","sun")], grouping = bordeaux$quality)
+#Calculate scores
+scores <- as.matrix(bordeaux[,c("rain","sun")])%*%matrix(bordeauxlda$scaling, ncol = 2)
+
+#NOTE - if use cross-validation option, scores are calculated automatically
+plot(scores[,1], scores[,2], type = "n", main = "Linear DCA scores for Bordeaux data",
+     xlab = "DCA Axis 1", ylab = "DCA Axis 2")
+
+bordeauxnames <- names(summary(bordeaux[,6]))
+
+
+for (i in 1:3){
+  points(scores[bordeaux$quality == bordeauxnames[i],1],
+         scores[bordeaux$quality == bordeauxnames[i],2], col = i+1, pch = 15+i, cex = 1.1)
+}
+legend("topright", legend = bordeauxnames, col = c(2:4), pch = c(15,16,17))
+```
+
+Only two discriminant functions (and second is probably not significant – note that there is not much
+discrimination in the direction of the second functions). Because we started with two dimensions, this is basically a rotation.
+
+Just as bonus, I included a partition plot as well.
+```{r}
+partimat(quality ~ rain+sun, data = bordeaux, method = "lda")
+```
+
+8)
+```{r}
+library(class)
+##run knn function
+bordeaux_train <- bordeaux[,(c("sun", "rain"))]
+bordeaux_test <-bordeaux[,(c("sun", "rain"))]
+pr <- knn(bordeaux_train, bordeaux_test, cl=bordeaux$quality, k=13)
+ 
+##create confusion matrix
+tab <- table(pr,bordeaux$quality)
+ 
+##this function divides the correct predictions by total number of predictions that tell us how accurate teh model is.
+ 
+accuracy <- function(x){sum(diag(x)/(sum(rowSums(x)))) * 100}
+accuracy(tab)
+```
+
+
+
+

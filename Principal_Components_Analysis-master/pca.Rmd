@@ -1,0 +1,114 @@
+---
+title: "PCA PSET"
+author: "Daniel Kim"
+date: "2/11/2020"
+output:
+  pdf_document: default
+  html_document:
+    df_print: paged
+---
+dataset: https://raw.githubusercontent.com/TWanish/NBAPlayerValue/master/data/nbaStats.csv
+
+```{r}
+library(corrplot)	
+library(PerformanceAnalytics)	
+```
+
+```{r}
+bball <- read.csv("https://raw.githubusercontent.com/TWanish/NBAPlayerValue/master/data/nbaStats.csv", header = T)
+names(bball)
+```
+	
+```{r}
+bball2 <- bball[, c("Player", "FG", "FGA","X3P" , "X3PA", "X2P", "X2PA", "FT","FTA","FT.","ORB","DRB","TRB","AST", "STL","BLK", "TOV", "PF" , "PTS" ,"ORtg", "DRtg", "PER", "TS.","FTr" ,"USG.","OWS" ,"DWS" , "WS" , "WS.48" ,"OBPM", "DBPM", "BPM", "VORP")]
+bball2 <- bball2[complete.cases(bball2),]
+dim(bball2)
+```
+
+1) 
+```{r}
+qqnorm(bball$FG)
+qqnorm(bball$FGA)
+qqnorm(bball$X3P)
+qqnorm(bball$X3PA)
+qqnorm(bball$ORB)
+```
+
+I made qqnorm plots for all of the variables and noticed that some were not straight lines indicating that some variables did not have normal distributions and thus the data does not seem to have a multivariate normal distribution. I only listed some of them here since the problem indicated that we did not have to turn it all in. This is confirmed when we create a chi-square quantile plot where the data goes outside the 95% Conf Limit lines.
+
+```{r}
+source("http://www.reuningscherer.net/STAT660/R/CSQPlot.r.txt")
+CSQPlot(bball2[,-1],label="Basketball Data")	
+```
+
+2)
+
+```{r}
+corrplot.mixed(cor(bball2[,-1]), lower.col = "black", upper = "ellipse", tl.col = "black", number.cex = .7, order = "hclust", tl.pos = "lt", tl.cex = .7)	
+```
+
+Between most of the variables, we seem to have signficant correlation values indicating that PCA will in fact work well for this data set.
+
+3)
+```{r}
+pc1 <- princomp(bball2[,-1], cor = TRUE)	#creates objects
+names(pc1)
+print(summary(pc1), digits = 2, loadings = pc1$loadings, cutoff=0)	#gets eigenvalues
+variances <- round(pc1$sdev^2,2)	#gets eigenvalues
+variances 
+```
+	
+-Total variance explained by a given number of principle components
+```{r}
+(11.25+7.90+3.72+2.42+1.51)/32
+```
+The total variance explained by the first 4 principal components makes up 83.75% of the total variance
+
+
+-The ‘eigenvalue > 1’ criteria
+The first 6 principal components have eigen values greater than one.
+
+-The ‘scree plot elbow’ method 
+```{r}
+screeplot(pc1 ,type="lines",col="red",lwd=2,pch=19,cex=1.2,main="Scree Plot of Raw BBALL Data")	
+```
+There seems to be elbows at around component 3 and component 5.
+	
+-Parallel Analysis
+```{r}
+source("http://www.reuningscherer.net/STAT660/R/parallel.r.txt")	
+parallelplot(pc1)	
+```
+
+The cutoff appears to be right before the 6th principal component. However, since our dataset is not multivariate normal, we wouldn't really use parallel analysis.
+
+Overall, I cutoff after the 5th component upon looking at all these tests.
+
+4) For the first principal component, it seems that Player Efficiency rating and Win Shares per 48 Minutes are the biggest contributers to this principal component (0.28, .24). They are positively correlated. This could represent the superstars of the game who have the highest efficiency and greatest impact on winning and conversely bench players with low efficiency and low impact on winning.
+
+For the second principal component, Field Goals Attempted, 3-pointers made, and 3-pointers attempted are signficant contributers to this principal component (0.24, 0.27, 0.28). They are all positively correlated. These are all negatively correlated with blocks, offensive rebounds, defensive rebounds, and total rebounds which also are significant contributers (-0.30, -0.26, -0.29). This could be for shorter players who shoot better but are not able to be near the basket near taller players and conversely bigmen who are poor shooters so they play near the basket.
+
+For the third principal component, the amount of 2-pointers attempted and Win Shares per 48 minutes are signficiant contributers (0.32, -0.24) and are negatively correlated indicating that players who may shoot the ball too much can negatively affect their team and players who shoot the ball less could positively impact their team.
+
+For the fourth principal component, points and field goals were significant contributers (0.17, 0.19) that were negatively correlated with assists and steals which were also significant contributers (-0.36, -0.42), indicating that some players focused on scoring rather than other aspects of the game and conversely those who pass and play more defense can score less
+
+For the fifth principal component, defensive win shares were significant contributers (0.28) and negatively correlated with free throws and free throws attempted (-0.32, -0.34) all with relatively high variability indicating that defensive-minded players might get to the free throw line less and thus make less of them and players who try to get to the free throw line more might expend less energy on defense.
+
+5)
+```{r}
+source("http://reuningscherer.net/stat660/r/ciscoreplot.R.txt")	
+ciscoreplot(pc1,c(1,2),bball2[,1])	
+biplot(pc1,choices=c(1,2),pc.biplot=T)	
+```
+
+For the score plot between the first two principal components, there is overall no groups/trends within the 95% confidence interval eclipse. However, it is noteworthy that the players outside of the 95% confidence interval ellipse seemed to be generally grouped into guards, forwards, and centers.
+	
+6) Overall, principal component analysis was pretty effective for this dataset. Many of the variables had significant enough correlation between them so that principal component analysis was effective. 
+
+```{r}
+chart.Correlation(bball2[, -1], histogram=TRUE, pch=19)
+```
+
+Looking at the matrix plot of Basketball Data, most of the scatterplots appear to be linear which means that principal component analysis holds under the assumption of linearity.
+
+Looking at the score plot, the biggest outliers for the first principal component were the superstars of the NBA since the first principal component largely represented players' efficiency and win share ratings, thus making sense. For the second principal component, the biggest outliers tend to be guards who shoot well on one end and big men who don't play on the perimiter on the other end which also makes sense since the second principal component largely represented 3 pointers versus blocks/rebounds. The sample size relative to the number of variables is largely sufficient since the NBA is such a large league with many players and there are a limited number of stats to keep track of. We have 665 observations and 32 variables measured which is well over what is needed even for a conservative amount.
