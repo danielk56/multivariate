@@ -1,0 +1,125 @@
+---
+title: "MANOVA_Daniel_Kim"
+author: "Daniel Kim"
+date: "3/23/2020"
+output:
+  pdf_document: default
+  html_document: default
+---
+
+```{r}
+library(MASS)
+library(ggpubr)
+library(DiscriMiner)
+library(klaR)
+```
+
+```{r}
+ocdData <- read.delim("OCD.dat", header = TRUE)
+```
+
+1)
+```{r}
+ggboxplot(
+  ocdData, x = "Group", y = c("Actions", "Thoughts"), 
+  merge = TRUE, palette = "jco"
+  )
+```
+
+```{r}
+ggboxplot(
+  ocdData, x = "Group", y = c("Actions"), 
+  merge = TRUE, palette = "jco"
+  )
+```
+
+```{r}
+ggboxplot(
+  ocdData, x = "Group", y = c("Thoughts"), 
+  merge = TRUE, palette = "jco"
+  )
+```
+
+There appears to be enough of some differences between the treatment groups for thoughts. For the action group, BT differs from both the CBT and No Treatment Control groups but it looks like we need more analysis to see whether differences actually exist.
+
+2)
+```{r}
+outcome <- cbind(ocdData$Actions, ocdData$Thoughts)
+ocdModel <- manova(outcome ~ Group, data=ocdData)
+```
+
+Let's look at one way MANOVA because we have one categorical predictor.
+```{r}
+summary.aov(ocdModel)
+```
+
+The p values indicate that there was no significant difference between therapy groups in terms of Thoughts (p=.136) and Actions (p=.08)
+
+Let's look at two way MANOVA to see what we can glean from it.
+```{r}
+summary.manova(ocdModel, intercept=TRUE)
+summary.manova(ocdModel,test="Wilks")
+summary.manova(ocdModel,test="Roy")
+```
+
+The p values indicate that there is a borderline difference between thearpy groups in terms of thoughts and actions.The reason for the anomaly is because MANOVA takes account of the correlation between dependent variables, and so for these data it has more power to detect group differences.
+
+3)
+
+```{r}
+library(contrast)
+library(sandwich)
+
+CBT_vs_NT <- c(1, 0, 0)
+BT_vs_NT <- c(0, 1, 0)
+contrasts(ocdData$Group) <- cbind(CBT_vs_NT, BT_vs_NT)
+```
+
+For contrasts we are comparing each of the treatment groups to the non-treatment group individually
+
+```{r}
+actionModel <- lm(Actions ~ Group, data=ocdData)
+thoughtsModel <- lm(Thoughts ~ Group, data=ocdData)
+```
+
+```{r}
+summary.lm(actionModel)
+summary.lm(thoughtsModel)
+```
+
+As expected, there is no significant difference. However, in actionModel, there appears to be a significant difference between BT to NT. It is on the borderline of the signficance level of 0.05 though so we could take a look at it later while adjusting for p-values.
+
+4)
+```{r}
+head(ocdData)
+```
+
+My dataset does not include any continuous predictors so I am unable to add a a continous variable to my model. My categorical predictor variable is Group and my two response variables are Actions and Thoghts.
+
+5)
+```{r}
+source("http://www.reuningscherer.net/STAT660/R/CSQPlot.r.txt")
+
+CSQPlot(ocdModel$residuals,label="Residuals from Cushings MANOVA")
+```
+
+The resulting plot looks good – no evidence of serious departure from multivariate normality
+
+BONUS)
+
+```{r}
+#General Multiple Comparison Corrections
+
+p.adjust(p=c(0.0438, 0.8720, 0.835, 0.104), method="bonferroni")
+
+p.adjust(p=c(0.0438, 0.8720, 0.835, 0.104), method="holm")
+
+p.adjust(p=c(0.0438, 0.8720, 0.835, 0.104), method="hochberg")
+```
+
+The new pvalues are all large enough where we fail to reject the null and we can't conclude that there are differences between Actions or Thoughts between the therapy groups for this dataset.
+
+
+
+
+
