@@ -1,1 +1,3 @@
-# multivariate
+# Multivariate Statistics
+
+A collection of my projects in my multivariate statistics class. Projects include Principal Components Analysis on 665 NBA players from the ‘16-‘17 season, Factor Analysis using datasets on pastry characteristics such as flakiness and density, MANOVA to look at difference in group means for OCD treatment groups, Discriminant Analysis looking at difference in Wine Quality groups based on sun and rain quantity, Oordination using a dataset on major cereal brands, Cluster Analysis using dataset regarding the top American higher educational institutions such as Harvard, Yale, Princeton, and more.
